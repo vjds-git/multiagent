@@ -933,6 +933,43 @@ Your responsibilities:
     reorders_placed: list of reorder confirmations
 """
 
+def _extract_json(text: str) -> dict:
+    """
+    Robustly extract the first valid JSON object from a model response.
+    Handles markdown code fences and duplicated/repeated JSON blocks.
+    """
+    if not text:
+        return {"raw": text}
+
+    # Strip markdown fences if present
+    cleaned = text
+    if "```" in cleaned:
+        parts = cleaned.split("```")
+        cleaned = parts[1]
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+
+    cleaned = cleaned.strip()
+
+    # Find the first balanced {...} block using a brace counter
+    start = cleaned.find("{")
+    if start == -1:
+        return {"raw": text}
+
+    depth = 0
+    for i in range(start, len(cleaned)):
+        if cleaned[i] == "{":
+            depth += 1
+        elif cleaned[i] == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = cleaned[start:i + 1]
+                try:
+                    return json.loads(candidate)
+                except Exception:
+                    return {"raw": text}
+
+    return {"raw": text}
 
 def inventory_agent(task: str, date: str) -> dict:
     """Run the Inventory Agent for a given task and date."""
@@ -941,15 +978,7 @@ def inventory_agent(task: str, date: str) -> dict:
         user_message=f"Date: {date}\nTask: {task}",
         tools_schema=INVENTORY_TOOLS_SCHEMA,
     )
-    try:
-        json_str = result_text
-        if "```" in json_str:
-            json_str = json_str.split("```")[1]
-            if json_str.startswith("json"):
-                json_str = json_str[4:]
-        return json.loads(json_str.strip())
-    except Exception:
-        return {"raw": result_text}
+    return _extract_json(result_text)
 
     ############
     ############
