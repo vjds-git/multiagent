@@ -980,6 +980,181 @@ def inventory_agent(task: str, date: str) -> dict:
     )
     return _extract_json(result_text)
 
+# ── Quoting Agent ────────────────────────────────────────────────
+
+QUOTING_TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_search_quote_history",
+            "description": "Search historical quotes for pricing context.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search_terms": {"type": "array", "items": {"type": "string"}},
+                    "limit": {"type": "integer", "default": 5},
+                },
+                "required": ["search_terms"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_calculate_quote",
+            "description": "Calculate a quoted price with bulk discounts for line items.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "line_items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_name": {"type": "string"},
+                                "quantity": {"type": "integer"},
+                                "unit_price": {"type": "number"},
+                            },
+                        },
+                    },
+                    "order_size": {"type": "string", "enum": ["small", "medium", "large"]},
+                },
+                "required": ["line_items", "order_size"],
+            },
+        },
+    },
+]
+
+TOOL_MAP["tool_search_quote_history"] = tool_search_quote_history
+TOOL_MAP["tool_calculate_quote"] = tool_calculate_quote
+
+QUOTING_AGENT_PROMPT = """You are the Quoting Agent for Munder Difflin Paper Company.
+Your responsibilities:
+- Use tool_search_quote_history to find relevant past quotes for pricing context.
+- Use tool_calculate_quote to compute a price with appropriate bulk discounts.
+- For each fulfillable item, use these standard unit prices:
+    A4 paper/Letter paper: $0.05-0.06/sheet, Cardstock: $0.15/sheet,
+    Colored paper: $0.10/sheet, Glossy paper: $0.20/sheet, Matte paper: $0.18/sheet,
+    Construction paper: $0.07/sheet, Poster paper: $0.25/sheet, Envelopes: $0.05/each,
+    Standard copy paper: $0.04/sheet. Use $0.10/unit as a default if item is not listed.
+- Bulk discounts: 10% for large orders or >2000 units; 5% for medium or >500 units.
+- Return ONLY a JSON object (no markdown, no commentary) with keys:
+    line_items: list of {item_name, quantity, unit_price, line_total}
+    subtotal, discount_pct, discount_amount, total
+    pricing_rationale: brief plain-English explanation of the pricing
+"""
+
+
+def quoting_agent(task: str, inventory_result: dict, order_size: str, date: str) -> dict:
+    """Run the Quoting Agent given inventory availability and order size."""
+    prompt = (
+        f"Date: {date}\n"
+        f"Order size: {order_size}\n"
+        f"Available items from inventory check:\n{json.dumps(inventory_result, indent=2)}\n"
+        f"Customer request: {task}"
+    )
+    result_text = run_agent(
+        system_prompt=QUOTING_AGENT_PROMPT,
+        user_message=prompt,
+        tools_schema=QUOTING_TOOLS_SCHEMA,
+    )
+    return _extract_json(result_text)
+
+
+# ── Sales Agent ────────────────────────────────────────────────
+
+SALES_TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_get_delivery_date",
+            "description": "Estimate delivery date based on order date and total quantity.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "as_of_date": {"type": "string"},
+                    "total_quantity": {"type": "integer"},
+                },
+                "required": ["as_of_date", "total_quantity"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_finalize_sale",
+            "description": "Record a completed sale in the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "line_items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_name": {"type": "string"},
+                                "quantity": {"type": "integer"},
+                            },
+                        },
+                    },
+                    "total_price": {"type": "number"},
+                    "as_of_date": {"type": "string"},
+                },
+                "required": ["line_items", "total_price", "as_of_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_get_cash_balance",
+            "description": "Get current cash balance as of a date.",
+            "parameters": {
+                "type": "object",
+                "properties": {"as_of_date": {"type": "string"}},
+                "required": ["as_of_date"],
+            },
+        },
+    },
+]
+
+TOOL_MAP["tool_get_delivery_date"] = tool_get_delivery_date
+TOOL_MAP["tool_finalize_sale"] = tool_finalize_sale
+TOOL_MAP["tool_get_cash_balance"] = tool_get_cash_balance
+
+SALES_AGENT_PROMPT = """You are the Sales Agent for Munder Difflin Paper Company.
+Your responsibilities:
+- Use tool_get_delivery_date to determine when the order will arrive.
+- Check if the delivery date is before the customer's requested delivery deadline.
+- Use tool_finalize_sale to record the transaction in the database.
+- Use tool_get_cash_balance for internal awareness only (never share it with customers).
+- Return ONLY a JSON object (no markdown, no commentary) with keys:
+    status: 'completed' or 'rejected'
+    reason: (if rejected, why)
+    transaction_ids: list of DB transaction IDs
+    delivery_date: confirmed delivery date
+    total_charged: final amount
+    customer_message: a polite, professional confirmation for the customer
+      (include delivery date, items, total — never reveal transaction IDs or cash balance)
+"""
+
+
+def sales_agent(line_items: list, total_price: float, date: str, customer_deadline: str) -> dict:
+    """Run the Sales Agent to finalize a transaction."""
+    prompt = (
+        f"Order date: {date}\n"
+        f"Customer requested delivery by: {customer_deadline}\n"
+        f"Line items to sell:\n{json.dumps(line_items, indent=2)}\n"
+        f"Total price to charge: ${total_price:.2f}\n"
+        "Please check delivery feasibility and finalize the sale if possible."
+    )
+    result_text = run_agent(
+        system_prompt=SALES_AGENT_PROMPT,
+        user_message=prompt,
+        tools_schema=SALES_TOOLS_SCHEMA,
+    )
+    return _extract_json(result_text)
+
     ############
     ############
     ############
