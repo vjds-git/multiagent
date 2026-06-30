@@ -711,6 +711,57 @@ def tool_reorder_item(item_name: str, quantity: int, as_of_date: str) -> dict:
         "message": f"Reorder placed: {quantity} units of '{item_name}' arriving by {delivery_date}.",
     }
 
+
+# ── Quoting tools ────────────────────────────────────────────────
+
+def tool_search_quote_history(search_terms: list, limit: int = 5) -> dict:
+    """Retrieve historical quotes relevant to the current request for pricing context."""
+    quotes = search_quote_history(search_terms, limit=limit)
+    return {"quotes": quotes, "count": len(quotes)}
+
+
+def tool_calculate_quote(line_items: list, order_size: str) -> dict:
+    """
+    Calculate a price quote with bulk discounts.
+    Discount tiers: large/>2000 units = 10%, medium/>500 units = 5%, else 0%.
+    """
+    subtotal = 0.0
+    total_qty = 0
+    breakdown = []
+
+    for item in line_items:
+        name = item["item_name"]
+        qty = item["quantity"]
+        price = item["unit_price"]
+        line_cost = round(qty * price, 2)
+        subtotal += line_cost
+        total_qty += qty
+        breakdown.append({
+            "item_name": name,
+            "quantity": qty,
+            "unit_price": price,
+            "line_total": line_cost,
+        })
+
+    if order_size == "large" or total_qty > 2000:
+        discount_pct = 0.10
+    elif order_size == "medium" or total_qty > 500:
+        discount_pct = 0.05
+    else:
+        discount_pct = 0.0
+
+    discount_amount = round(subtotal * discount_pct, 2)
+    total = round(subtotal - discount_amount, 2)
+
+    return {
+        "line_items": breakdown,
+        "subtotal": round(subtotal, 2),
+        "discount_pct": int(discount_pct * 100),
+        "discount_amount": discount_amount,
+        "total": total,
+        "order_size_label": order_size,
+    }
+
     ############
     ############
     ############
