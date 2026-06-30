@@ -646,6 +646,56 @@ def run_test_scenarios():
     current_cash = report["cash_balance"]
     current_inventory = report["inventory_value"]
 
+# ── Inventory tools ────────────────────────────────────────────────
+
+def tool_check_all_inventory(as_of_date: str) -> dict:
+    """Return the full inventory snapshot as of a given date."""
+    inventory = get_all_inventory(as_of_date)
+    return {
+        "available_items": inventory,
+        "item_count": len(inventory),
+        "as_of_date": as_of_date,
+    }
+
+
+def tool_check_item_stock(item_name: str, as_of_date: str, requested_qty: int) -> dict:
+    """Check whether sufficient stock exists for a specific item and quantity."""
+    result_df = get_stock_level(item_name, as_of_date)
+    stock = int(result_df["current_stock"].iloc[0]) if not result_df.empty else 0
+    can_fulfill = stock >= requested_qty
+    return {
+        "item_name": item_name,
+        "current_stock": stock,
+        "requested_qty": requested_qty,
+        "can_fulfill": can_fulfill,
+        "shortfall": max(0, requested_qty - stock),
+    }
+
+
+def tool_reorder_item(item_name: str, quantity: int, as_of_date: str) -> dict:
+    """Place a stock replenishment order for a low-stock item."""
+    unit_price = next(
+        (p["unit_price"] for p in paper_supplies if p["item_name"] == item_name), 0.10
+    )
+    total_cost = round(unit_price * quantity, 2)
+    delivery_date = get_supplier_delivery_date(as_of_date, quantity)
+
+    txn_id = create_transaction(
+        item_name=item_name,
+        transaction_type="stock_orders",
+        quantity=quantity,
+        price=total_cost,
+        date=as_of_date,
+    )
+    return {
+        "transaction_id": txn_id,
+        "item_name": item_name,
+        "quantity": quantity,
+        "total_cost": total_cost,
+        "delivery_date": delivery_date,
+        "message": f"Reorder placed: {quantity} units of '{item_name}' arriving by {delivery_date}.",
+    }
+
     ############
     ############
     ############
