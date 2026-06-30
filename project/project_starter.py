@@ -762,6 +762,55 @@ def tool_calculate_quote(line_items: list, order_size: str) -> dict:
         "order_size_label": order_size,
     }
 
+    # ── Sales tools ────────────────────────────────────────────────
+
+def tool_get_delivery_date(as_of_date: str, total_quantity: int) -> dict:
+    """Estimate supplier delivery date based on total order quantity."""
+    as_of_date = normalize_date(as_of_date)
+    delivery = get_supplier_delivery_date(as_of_date, total_quantity)
+    order_dt = datetime.fromisoformat(as_of_date)
+    delivery_dt = datetime.fromisoformat(delivery)
+    lead_days = (delivery_dt - order_dt).days
+    return {
+        "order_date": as_of_date,
+        "delivery_date": delivery,
+        "lead_days": lead_days,
+    }
+
+
+def tool_finalize_sale(line_items: list, total_price: float, as_of_date: str) -> dict:
+    """Record completed sale transactions for each line item."""
+    as_of_date = normalize_date(as_of_date)
+    txn_ids = []
+    total_qty = sum(item["quantity"] for item in line_items)
+
+    for item in line_items:
+        share = item["quantity"] / total_qty if total_qty else 0
+        item_price = round(total_price * share, 2)
+        txn_id = create_transaction(
+            item_name=item["item_name"],
+            transaction_type="sales",
+            quantity=item["quantity"],
+            price=item_price,
+            date=as_of_date,
+        )
+        txn_ids.append(txn_id)
+
+    return {
+        "transaction_ids": txn_ids,
+        "total_charged": total_price,
+        "sale_date": as_of_date,
+        "items_sold": len(line_items),
+        "status": "completed",
+    }
+
+
+def tool_get_cash_balance(as_of_date: str) -> dict:
+    """Return current cash balance as of a date."""
+    as_of_date = normalize_date(as_of_date)
+    balance = get_cash_balance(as_of_date)
+    return {"cash_balance": round(balance, 2), "as_of_date": as_of_date}
+
     ############
     ############
     ############
