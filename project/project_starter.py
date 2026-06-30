@@ -625,26 +625,6 @@ client = OpenAI(
 
 MODEL = "gpt-3.5-turbo"
 
-def run_test_scenarios():
-    
-    print("Initializing Database...")
-    init_database()
-    try:
-        quote_requests_sample = pd.read_csv("quote_requests_sample.csv")
-        quote_requests_sample["request_date"] = pd.to_datetime(
-            quote_requests_sample["request_date"], format="%m/%d/%y", errors="coerce"
-        )
-        quote_requests_sample.dropna(subset=["request_date"], inplace=True)
-        quote_requests_sample = quote_requests_sample.sort_values("request_date")
-    except Exception as e:
-        print(f"FATAL: Error loading test data: {e}")
-        return
-
-    # Get initial state
-    initial_date = quote_requests_sample["request_date"].min().strftime("%Y-%m-%d")
-    report = generate_financial_report(initial_date)
-    current_cash = report["cash_balance"]
-    current_inventory = report["inventory_value"]
 
 # ── Inventory tools ────────────────────────────────────────────────
 
@@ -1161,6 +1141,124 @@ def sales_agent(line_items: list, total_price: float, date: str, customer_deadli
     )
     return _extract_json(result_text)
 
+# ── Orchestrator ────────────────────────────────────────────────
+
+ORCHESTRATOR_SYSTEM_NOTE = """
+(Orchestrator logic is implemented in Python below, not as a separate LLM call,
+since it deterministically sequences Inventory -> Quoting -> Sales and composes
+the final customer-facing message.)
+"""
+
+
+def handle_customer_request(request: str, request_date: str, order_size: str = "small") -> str:
+    """
+    Main orchestration entry point. Runs Inventory -> Quoting -> Sales in sequence
+    and composes a professional, customer-facing response.
+    """
+    print(f"\n[Orchestrator] Processing request ({order_size}, {request_date})")
+
+    # Step 1: Inventory check
+    print("[InventoryAgent] Checking stock...")
+    inv_result = inventory_agent(request, request_date)
+    fulfilled_items = inv_result.get("fulfilled_items", [])
+    unfulfillable_items = inv_result.get("unfulfillable_items", [])
+
+    if not fulfilled_items:
+        unful_summary = ", ".join(
+            f"{u.get('item_name', 'item')} ({u.get('reason', 'not available')})"
+            for u in unfulfillable_items
+        ) or "the requested items are not currently in stock"
+        return (
+            "Thank you for your inquiry. Unfortunately, we are unable to fulfill your request "
+            f"at this time: {unful_summary}. We apologize for any inconvenience."
+        )
+
+    # Step 2: Quote
+    print("[QuotingAgent] Generating quote...")
+    quote_result = quoting_agent(request, inv_result, order_size, request_date)
+
+    line_items_for_sale = [
+        {"item_name": li["item_name"], "quantity": li["quantity"]}
+        for li in quote_result.get("line_items", [])
+    ]
+    total_price = float(quote_result.get("total", 0.0))
+
+    if not line_items_for_sale:
+        return (
+            "Thank you for your inquiry. We were unable to prepare a quote for the requested items. "
+            "Please contact us directly for assistance."
+        )
+
+    # Step 3: Extract customer deadline (simple heuristic) or default to +14 days
+    deadline_match = re.search(
+        r"by\s+(\w+)\s+(\d{1,2}),?\s*(202\d)?", request, re.IGNORECASE
+    )
+    month_map = {"january": "01", "february": "02", "march": "03", "april": "04",
+                 "may": "05", "june": "06", "july": "07", "august": "08",
+                 "september": "09", "october": "10", "november": "11", "december": "12"}
+    if deadline_match and deadline_match.group(1).lower() in month_map:
+        month = month_map[deadline_match.group(1).lower()]
+        day = deadline_match.group(2).zfill(2)
+        year = deadline_match.group(3) or "2025"
+        customer_deadline = f"{year}-{month}-{day}"
+    else:
+        from datetime import timedelta
+        customer_deadline = (
+            datetime.fromisoformat(normalize_date(request_date)) + timedelta(days=14)
+        ).strftime("%Y-%m-%d")
+
+    # Step 4: Finalize sale
+    print("[SalesAgent] Finalizing transaction...")
+    sale_result = sales_agent(line_items_for_sale, total_price, request_date, customer_deadline)
+
+    # Step 5: Compose final customer-facing response
+    if sale_result.get("customer_message"):
+        customer_facing = sale_result["customer_message"]
+    else:
+        status = sale_result.get("status", "completed")
+        if status == "rejected":
+            reason = sale_result.get("reason", "we could not meet your delivery deadline")
+            customer_facing = f"Thank you for your order. Unfortunately, {reason}."
+        else:
+            customer_facing = (
+                f"Thank you for your order! Total charged: ${total_price:.2f}. "
+                f"Delivery estimated: {sale_result.get('delivery_date', customer_deadline)}."
+            )
+
+    # Add a note about unfulfillable items if any
+    if unfulfillable_items:
+        unful_names = ", ".join(u.get("item_name", "item") for u in unfulfillable_items)
+        customer_facing += (
+            f"\n\nPlease note: the following items could not be included in this order: "
+            f"{unful_names}. We apologize for any inconvenience."
+        )
+
+    return customer_facing
+
+
+def run_test_scenarios():
+    """Process all sample requests through the multi-agent system and save results."""
+    print("Initializing Database...")
+    init_database(db_engine)
+
+    try:
+        quote_requests_sample = pd.read_csv("quote_requests_sample.csv")
+        quote_requests_sample["request_date"] = pd.to_datetime(
+            quote_requests_sample["request_date"], format="%m/%d/%y", errors="coerce"
+        )
+        quote_requests_sample.dropna(subset=["request_date"], inplace=True)
+        quote_requests_sample = quote_requests_sample.sort_values("request_date")
+    except Exception as e:
+        print(f"FATAL: Error loading test data: {e}")
+        return
+
+    initial_date = quote_requests_sample["request_date"].min().strftime("%Y-%m-%d")
+    report = generate_financial_report(initial_date)
+    current_cash = report["cash_balance"]
+    current_inventory = report["inventory_value"]
+
+    results = []
+
     ############
     ############
     ############
@@ -1169,7 +1267,6 @@ def sales_agent(line_items: list, total_price: float, date: str, customer_deadli
     ############
     ############
 
-    results = []
     for idx, row in quote_requests_sample.iterrows():
         request_date = row["request_date"].strftime("%Y-%m-%d")
 
@@ -1190,7 +1287,11 @@ def sales_agent(line_items: list, total_price: float, date: str, customer_deadli
         ############
         ############
 
-        # response = call_your_multi_agent_system(request_with_date)
+        response = handle_customer_request(
+            request=request_with_date,
+            request_date=request_date,
+            order_size=str(row.get("need_size", "small")).lower()
+        )
 
         # Update state
         report = generate_financial_report(request_date)
