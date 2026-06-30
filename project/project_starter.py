@@ -620,7 +620,7 @@ load_dotenv()
 # OpenAI-compatible client pointing to Vocareum proxy
 client = OpenAI(
     base_url="https://openai.vocareum.com/v1",
-    api_key=os.environ.get("OPENAI_API_KEY", ""),
+    api_key=os.environ.get("UDACITY_OPENAI_API_KEY", ""),
 )
 
 MODEL = "gpt-3.5-turbo"
