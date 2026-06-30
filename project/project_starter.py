@@ -610,6 +610,21 @@ def search_quote_history(search_terms: List[str], limit: int = 5) -> List[Dict]:
 
 # Run your test scenarios by writing them here. Make sure to keep track of them.
 
+import json
+import re
+from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# OpenAI-compatible client pointing to Vocareum proxy
+client = OpenAI(
+    base_url="https://openai.vocareum.com/v1",
+    api_key=os.environ.get("OPENAI_API_KEY", ""),
+)
+
+MODEL = "gpt-3.5-turbo"
+
 def run_test_scenarios():
     
     print("Initializing Database...")
