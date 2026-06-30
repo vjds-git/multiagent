@@ -811,6 +811,146 @@ def tool_get_cash_balance(as_of_date: str) -> dict:
     balance = get_cash_balance(as_of_date)
     return {"cash_balance": round(balance, 2), "as_of_date": as_of_date}
 
+
+# ── Tool schemas (OpenAI function-calling format) ────────────────────
+
+INVENTORY_TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_check_all_inventory",
+            "description": "Get full inventory snapshot as of a date.",
+            "parameters": {
+                "type": "object",
+                "properties": {"as_of_date": {"type": "string"}},
+                "required": ["as_of_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_check_item_stock",
+            "description": "Check stock for a specific item and whether the requested quantity can be fulfilled.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "item_name": {"type": "string"},
+                    "as_of_date": {"type": "string"},
+                    "requested_qty": {"type": "integer"},
+                },
+                "required": ["item_name", "as_of_date", "requested_qty"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_reorder_item",
+            "description": "Place a replenishment stock order for a low-stock item.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "item_name": {"type": "string"},
+                    "quantity": {"type": "integer"},
+                    "as_of_date": {"type": "string"},
+                },
+                "required": ["item_name", "quantity", "as_of_date"],
+            },
+        },
+    },
+]
+
+# ── Tool dispatcher ────────────────────────────────────────────────
+
+TOOL_MAP = {
+    "tool_check_all_inventory": tool_check_all_inventory,
+    "tool_check_item_stock": tool_check_item_stock,
+    "tool_reorder_item": tool_reorder_item,
+}
+
+
+def dispatch_tool(tool_name: str, tool_args: dict) -> str:
+    """Execute the named tool with the given arguments and return a JSON string."""
+    fn = TOOL_MAP.get(tool_name)
+    if fn is None:
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+    try:
+        result = fn(**tool_args)
+        return json.dumps(result, default=str)
+    except Exception as exc:
+        return json.dumps({"error": str(exc)})
+
+
+def run_agent(system_prompt: str, user_message: str, tools_schema: list, max_steps: int = 6) -> str:
+    """Run an agentic loop: call the LLM, dispatch any tool calls, repeat until done."""
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_message},
+    ]
+
+    for _step in range(max_steps):
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            tools=tools_schema if tools_schema else None,
+            tool_choice="auto" if tools_schema else None,
+        )
+        msg = response.choices[0].message
+
+        if msg.tool_calls:
+            messages.append({
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ],
+            })
+            for tc in msg.tool_calls:
+                args = json.loads(tc.function.arguments)
+                result = dispatch_tool(tc.function.name, args)
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+        else:
+            return msg.content or ""
+
+    return "Agent reached step limit without a final response."
+
+
+# ── Inventory Agent ────────────────────────────────────────────────
+
+INVENTORY_AGENT_PROMPT = """You are the Inventory Agent for Munder Difflin Paper Company.
+Your responsibilities:
+- Use tool_check_all_inventory or tool_check_item_stock to verify stock availability.
+- Map customer item descriptions to the closest matching inventory item names.
+- For each item requested, report: item name, current stock, quantity requested, can_fulfill (yes/no).
+- If an item is not in our inventory, say so clearly.
+- If stock would fall below ~100 units after the sale, use tool_reorder_item to reorder 500 units.
+- Return ONLY a JSON object (no markdown, no commentary) with keys:
+    fulfilled_items: list of {item_name, catalog_name, quantity, stock_available, fulfillable}
+    unfulfillable_items: list of {item_name, reason}
+    reorders_placed: list of reorder confirmations
+"""
+
+
+def inventory_agent(task: str, date: str) -> dict:
+    """Run the Inventory Agent for a given task and date."""
+    result_text = run_agent(
+        system_prompt=INVENTORY_AGENT_PROMPT,
+        user_message=f"Date: {date}\nTask: {task}",
+        tools_schema=INVENTORY_TOOLS_SCHEMA,
+    )
+    try:
+        json_str = result_text
+        if "```" in json_str:
+            json_str = json_str.split("```")[1]
+            if json_str.startswith("json"):
+                json_str = json_str[4:]
+        return json.loads(json_str.strip())
+    except Exception:
+        return {"raw": result_text}
+
     ############
     ############
     ############
