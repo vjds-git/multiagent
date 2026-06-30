@@ -648,8 +648,21 @@ def run_test_scenarios():
 
 # ── Inventory tools ────────────────────────────────────────────────
 
+def normalize_date(date_str: str) -> str:
+    """
+    Ensure a date string includes a time component so SQLite string
+    comparisons against stored timestamps behave correctly.
+    Converts 'YYYY-MM-DD' -> 'YYYY-MM-DDT23:59:59'.
+    If already has a time component, returns as-is.
+    """
+    if "T" in date_str:
+        return date_str
+    return f"{date_str}T23:59:59"
+
+
 def tool_check_all_inventory(as_of_date: str) -> dict:
     """Return the full inventory snapshot as of a given date."""
+    as_of_date = normalize_date(as_of_date)
     inventory = get_all_inventory(as_of_date)
     return {
         "available_items": inventory,
@@ -660,6 +673,7 @@ def tool_check_all_inventory(as_of_date: str) -> dict:
 
 def tool_check_item_stock(item_name: str, as_of_date: str, requested_qty: int) -> dict:
     """Check whether sufficient stock exists for a specific item and quantity."""
+    as_of_date = normalize_date(as_of_date)
     result_df = get_stock_level(item_name, as_of_date)
     stock = int(result_df["current_stock"].iloc[0]) if not result_df.empty else 0
     can_fulfill = stock >= requested_qty
@@ -674,6 +688,7 @@ def tool_check_item_stock(item_name: str, as_of_date: str, requested_qty: int) -
 
 def tool_reorder_item(item_name: str, quantity: int, as_of_date: str) -> dict:
     """Place a stock replenishment order for a low-stock item."""
+    as_of_date = normalize_date(as_of_date)
     unit_price = next(
         (p["unit_price"] for p in paper_supplies if p["item_name"] == item_name), 0.10
     )
