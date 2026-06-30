@@ -1032,6 +1032,12 @@ QUOTING_AGENT_PROMPT = """You are the Quoting Agent for Munder Difflin Paper Com
 Your responsibilities:
 - Use tool_search_quote_history to find relevant past quotes for pricing context.
 - Use tool_calculate_quote to compute a price with appropriate bulk discounts.
+- IMPORTANT: Only quote and charge for items in "fulfilled_items" from the inventory check,
+  using the EXACT quantity the customer requested — never the reorder quantity.
+- IGNORE "reorders_placed" entirely when building the quote. Reorders are internal restocking
+  actions for our own warehouse and are NOT sold to the customer, and must NEVER appear as a
+  line item in the quote.
+- Do not invent extra line items beyond what the customer actually asked for.
 - For each fulfillable item, use these standard unit prices:
     A4 paper/Letter paper: $0.05-0.06/sheet, Cardstock: $0.15/sheet,
     Colored paper: $0.10/sheet, Glossy paper: $0.20/sheet, Matte paper: $0.18/sheet,
