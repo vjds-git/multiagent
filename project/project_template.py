@@ -988,6 +988,8 @@ def inventory_agent(task: str, date: str) -> dict:
         agent_tools=[tool_check_all_inventory, tool_check_item_stock, tool_reorder_item],
     )
     return _extract_json(result_text)
+    print(f"[DEBUG InventoryAgent raw result]: {result}")  # ← add this line
+    return result
 
 # ── Quoting Agent ────────────────────────────────────────────────
 
