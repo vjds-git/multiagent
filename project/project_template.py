@@ -669,16 +669,25 @@ def tool_check_item_stock(item_name: str, as_of_date: str, requested_qty: int) -
     Check whether sufficient stock exists for a specific item and quantity.
 
     Args:
-        item_name: Exact name of the inventory item to check
+        item_name: Name of the inventory item to check (case-insensitive)
         as_of_date: ISO date string in YYYY-MM-DD format
         requested_qty: Number of units the customer wants
     """
     as_of_date = normalize_date(as_of_date)
-    result_df = get_stock_level(item_name, as_of_date)
+
+    # Case-insensitive match against actual inventory catalog
+    all_inv = get_all_inventory(as_of_date)
+    matched_name = item_name
+    for catalog_name in all_inv.keys():
+        if catalog_name.lower() == item_name.lower():
+            matched_name = catalog_name
+            break
+
+    result_df = get_stock_level(matched_name, as_of_date)
     stock = int(result_df["current_stock"].iloc[0]) if not result_df.empty else 0
     can_fulfill = stock >= requested_qty
     return {
-        "item_name": item_name,
+        "item_name": matched_name,
         "current_stock": stock,
         "requested_qty": requested_qty,
         "can_fulfill": can_fulfill,
@@ -924,6 +933,9 @@ def run_agent(system_prompt: str, user_message: str, agent_tools: list, max_step
     )
     full_prompt = f"{system_prompt}\n\n{user_message}"
     result = agent.run(full_prompt)
+        # smolagents returns the final_answer value directly — could be dict, str, or other
+    if isinstance(result, dict):
+        return result
     return str(result)
 
 
@@ -987,11 +999,10 @@ def inventory_agent(task: str, date: str) -> dict:
         user_message=f"Date: {date}\nTask: {task}",
         agent_tools=[tool_check_all_inventory, tool_check_item_stock, tool_reorder_item],
     )
-    # smolagents returns the final_answer value directly — if it's already a dict, use it
     if isinstance(result, dict):
         return result
-    # Otherwise fall back to JSON string parsing
     return _extract_json(str(result))
+
 
 # ── Quoting Agent ────────────────────────────────────────────────
 
@@ -1080,6 +1091,8 @@ def quoting_agent(task: str, inventory_result: dict, order_size: str, date: str)
     if isinstance(result, dict):
         return result
     return _extract_json(str(result))
+
+
 
 
 
@@ -1198,7 +1211,9 @@ def handle_customer_request(request: str, request_date: str, order_size: str = "
     # Step 1: Inventory check
     print("[InventoryAgent] Checking stock...")
     inv_result = inventory_agent(request, request_date)
-    fulfilled_items = inv_result.get("fulfilled_items", [])
+    fulfilled_items = [
+    item for item in inv_result.get("fulfilled_items", [])
+    if str(item.get("fulfillable", "")).lower() == "yes"]
     unfulfillable_items = inv_result.get("unfulfillable_items", [])
 
     if not fulfilled_items:
