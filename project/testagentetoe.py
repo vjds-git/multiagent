@@ -1,4 +1,4 @@
-from project_starter import init_database, db_engine, handle_customer_request
+from project_template import init_database, db_engine, handle_customer_request
 
 init_database(db_engine)
 

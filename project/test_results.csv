@@ -1,0 +1,39 @@
+request_id,request_date,cash_balance,inventory_value,response
+1,2025-04-01,45059.7,4940.299999999999,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: A4 glossy paper (Not available in inventory), heavy cardstock (Not available in inventory), colored paper (Not available in inventory). We apologize for any inconvenience."
+2,2025-04-03,44909.7,4940.299999999999,"Your order has been confirmed. The expected delivery date is 2025-04-07. You have purchased 500 Large poster paper (24x36 inches), 300 Rolls of banner paper (36-inch width), and 200 Balloons. The total charged amount is $180.50.
+
+Please note: the following items could not be included in this order: Balloons. We apologize for any inconvenience."
+3,2025-04-04,45040.2,3690.2999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: A4 paper (Unavailable in sufficient quantity), A3 paper (Unavailable in sufficient quantity), Printer paper (Unavailable in sufficient quantity). We apologize for any inconvenience."
+4,2025-04-05,44915.2,3715.2999999999997,Your order has been confirmed. The estimated delivery date is 2025-04-09. You have purchased 500 units of Cardstock and 250 units of A4 paper for a total of $83.12. Thank you for choosing Munder Difflin Paper Company.
+5,2025-04-05,44915.2,3715.2999999999997,"Your order has been confirmed. The delivery is scheduled for April 9, 2025. You have purchased 500 units of Colored paper and 300 units of Cardstock. The total charged amount is $90.25.
+
+Please note: the following items could not be included in this order: Decorative washi tape. We apologize for any inconvenience."
+6,2025-04-06,44963.57000000001,3657.7999999999997,"Your order has been confirmed. The estimated delivery date is 2025-04-10. Your items include 500 units of Colored paper, 300 units of Printer paper, and 200 units of Cardstock. The total amount charged is $87.40."
+7,2025-04-07,45050.97,3577.7999999999997,"Your order has been successfully finalized. The estimated delivery date is 2025-04-14. 
+
+Items: 
+- 500 x A4 glossy paper
+- 200 x heavy cardstock
+- 1000 x A3 paper
+- 300 x Large poster paper (24x36 inches)
+
+Total Charged: $346.50"
+8,2025-04-07,45050.97,3577.7999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: A4 glossy paper (Item not in inventory.), A4 matte paper (Item not in inventory.), A5 colored paper (Item not in inventory.), A4 recycled paper (Item not in inventory.). We apologize for any inconvenience."
+9,2025-04-07,45050.97,3577.7999999999997,"Your order has been confirmed. The estimated delivery date is April 11, 2025. You have purchased A4 paper (200 units), A3 glossy paper (100 units), and 100% recycled kraft paper envelopes (50 units). The total amount charged is $34.50.
+
+Please note: the following items could not be included in this order: A3 glossy paper, 100% recycled kraft paper envelopes. We apologize for any inconvenience."
+13,2025-04-08,44681.97,3267.7999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: A4 paper (Not enough stock available, shortfall of 178 units), Cardstock (Not enough stock available, shortfall of 105 units). We apologize for any inconvenience."
+12,2025-04-08,44681.97,3267.7999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: colorful cardstock (Item not in inventory), standard printer paper (Item not in inventory), paper napkins (Item not in inventory). We apologize for any inconvenience."
+10,2025-04-08,44681.97,3267.7999999999997,"Your order has been successfully finalized. The estimated delivery date is April 12th, 2025. You have purchased 500 units of A4 glossy paper and 300 units of Cardstock for a total of $137.75."
+11,2025-04-08,44681.97,3267.7999999999997,"Your order has been confirmed. The estimated delivery date is April 12, 2025. Items: A3 glossy paper - 500 quantity, A4 matte paper - 300 quantity. Total charged: $146.30. Thank you!"
+14,2025-04-09,44816.020000000004,3322.7999999999997,"Your order has been confirmed. The estimated delivery date is on April 16, 2025. The items you purchased include: A4 paper (Quantity: 5000), A5 colored paper (Quantity: 2000), and Cardstock (Quantity: 500). The total charged amount is $472.50. Thank you for choosing Munder Difflin Paper Company."
+15,2025-04-12,44963.520000000004,3322.7999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: A4 paper (Not in inventory), colored paper (Not in inventory), Cardstock (Not in inventory). We apologize for any inconvenience."
+16,2025-04-13,43888.52,3897.7999999999997,"Your order has been confirmed. The delivery is scheduled for April 17, 2025. Items: A4 paper - 500 units, Colorful construction paper - 200 units, Poster board - 100 units. Total charged: $66.50
+
+Please note: the following items could not be included in this order: Colorful construction paper, Poster board. We apologize for any inconvenience."
+17,2025-04-14,43855.009999999995,3872.7999999999997,"Your order has been confirmed. The expected delivery date is April 21, 2025. You have purchased 1000 units of A4 paper, 500 units of Colored paper, and 500 units of Paper plates for a total of $142.50.
+
+Please note: the following items could not be included in this order: Colored paper, Table napkins, Paper cups. We apologize for any inconvenience."
+18,2025-04-14,43855.009999999995,3872.7999999999997,"Your order has been confirmed. The estimated delivery date is April 21, 2025. You have purchased Cardstock (500 units), Printer paper (1000 units), and colored paper (200 units). The total amount charged is $128.25. Thank you for choosing Munder Difflin Paper Company."
+19,2025-04-15,43945.74999999999,3647.7999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: A4 glossy paper (Not in stock), A3 matte paper (Not in stock), cardstock (Not in stock). We apologize for any inconvenience."
+20,2025-04-17,43795.74999999999,3647.7999999999997,"Thank you for your inquiry. Unfortunately, we are unable to fulfill your request at this time: Flyers (Not available in stock and reorder placed), Posters (Not available in stock and reorder placed), Tickets (Not available in stock and reorder placed). We apologize for any inconvenience."
