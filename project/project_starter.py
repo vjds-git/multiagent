@@ -1226,8 +1226,17 @@ def handle_customer_request(request: str, request_date: str, order_size: str = "
             )
 
     # Add a note about unfulfillable items if any
-    if unfulfillable_items:
-        unful_names = ", ".join(u.get("item_name", "item") for u in unfulfillable_items)
+    # Filter out any item that was already fulfilled (LLM inconsistency guard)
+    fulfilled_names = {
+        fi.get("item_name", "").lower() for fi in fulfilled_items
+    }
+    true_unfulfillable = [
+        u for u in unfulfillable_items
+        if u.get("item_name", "").lower() not in fulfilled_names
+    ]
+
+    if true_unfulfillable:
+        unful_names = ", ".join(u.get("item_name", "item") for u in true_unfulfillable)
         customer_facing += (
             f"\n\nPlease note: the following items could not be included in this order: "
             f"{unful_names}. We apologize for any inconvenience."
