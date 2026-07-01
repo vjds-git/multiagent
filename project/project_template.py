@@ -1192,6 +1192,43 @@ def sales_agent(line_items: list, total_price: float, date: str, customer_deadli
         return result
     return _extract_json(str(result))
 
+# ── Advisor Agent ────────────────────────────────────────────────
+
+@tool
+def tool_financial_report(as_of_date: str) -> dict:
+    """
+    Generate a full financial report including cash balance, inventory value, and top sellers.
+
+    Args:
+        as_of_date: ISO date string in YYYY-MM-DD format
+    """
+    as_of_date = normalize_date(as_of_date)
+    return generate_financial_report(as_of_date)
+
+
+TOOL_MAP["tool_financial_report"] = tool_financial_report
+
+ADVISOR_AGENT_PROMPT = """You are the Advisor Agent for Munder Difflin Paper Company.
+Your responsibilities:
+- Use tool_financial_report to retrieve the current financial snapshot.
+- Summarise the company's cash position, inventory value, and top-selling products.
+- Identify 2-3 actionable recommendations to improve revenue or operational efficiency.
+- Keep your analysis concise and internal — this report is for management, not customers.
+- Return a plain-English advisory summary (no JSON required).
+"""
+
+
+def advisor_agent(date: str) -> str:
+    """Run the Advisor Agent and return its business analysis report."""
+    result = run_agent(
+        system_prompt=ADVISOR_AGENT_PROMPT,
+        user_message=f"Please analyse company performance as of {date} and provide recommendations.",
+        agent_tools=[tool_financial_report],
+    )
+    if isinstance(result, dict):
+        return str(result)
+    return str(result)
+
 # ── Orchestrator ────────────────────────────────────────────────
 
 ORCHESTRATOR_SYSTEM_NOTE = """
@@ -1319,6 +1356,11 @@ def run_test_scenarios():
     current_cash = report["cash_balance"]
     current_inventory = report["inventory_value"]
 
+    # ── Advisor Agent initial analysis ──────────────────
+    print("\n[AdvisorAgent] Initial business analysis...")
+    initial_advice = advisor_agent(initial_date)
+    print(f"Advisor: {str(initial_advice)[:300]}...")
+    # ─────────────────────────────────────────────────────────────
     results = []
 
     ############
@@ -1382,6 +1424,12 @@ def run_test_scenarios():
     print("\n===== FINAL FINANCIAL REPORT =====")
     print(f"Final Cash: ${final_report['cash_balance']:.2f}")
     print(f"Final Inventory: ${final_report['inventory_value']:.2f}")
+
+    # ──Advisor Agent final analysis ────────────────────
+    print("\n[AdvisorAgent] Final business analysis...")
+    final_advice = advisor_agent(final_date)
+    print(f"Advisor: {str(final_advice)[:300]}...")
+    # ─────────────────────────────────────────────────────────────
 
     # Save results
     pd.DataFrame(results).to_csv("test_results.csv", index=False)
