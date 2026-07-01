@@ -982,14 +982,16 @@ def _extract_json(text: str) -> dict:
 
 def inventory_agent(task: str, date: str) -> dict:
     """Run the Inventory Agent for a given task and date."""
-    result_text = run_agent(
+    result = run_agent(
         system_prompt=INVENTORY_AGENT_PROMPT,
         user_message=f"Date: {date}\nTask: {task}",
         agent_tools=[tool_check_all_inventory, tool_check_item_stock, tool_reorder_item],
     )
-    return _extract_json(result_text)
-    print(f"[DEBUG InventoryAgent raw result]: {result}")  # ← add this line
-    return result
+    # smolagents returns the final_answer value directly — if it's already a dict, use it
+    if isinstance(result, dict):
+        return result
+    # Otherwise fall back to JSON string parsing
+    return _extract_json(str(result))
 
 # ── Quoting Agent ────────────────────────────────────────────────
 
@@ -1070,12 +1072,15 @@ def quoting_agent(task: str, inventory_result: dict, order_size: str, date: str)
         f"Available items from inventory check:\n{json.dumps(inventory_result, indent=2)}\n"
         f"Customer request: {task}"
     )
-    result_text = run_agent(
+    result = run_agent(
         system_prompt=QUOTING_AGENT_PROMPT,
         user_message=prompt,
         agent_tools=[tool_search_quote_history, tool_calculate_quote],
     )
-    return _extract_json(result_text)
+    if isinstance(result, dict):
+        return result
+    return _extract_json(str(result))
+
 
 
 # ── Sales Agent ────────────────────────────────────────────────
@@ -1165,12 +1170,14 @@ def sales_agent(line_items: list, total_price: float, date: str, customer_deadli
         f"Total price to charge: ${total_price:.2f}\n"
         "Please check delivery feasibility and finalize the sale if possible."
     )
-    result_text = run_agent(
+    result = run_agent(
         system_prompt=SALES_AGENT_PROMPT,
         user_message=prompt,
         agent_tools=[tool_get_delivery_date, tool_finalize_sale, tool_get_cash_balance],
     )
-    return _extract_json(result_text)
+    if isinstance(result, dict):
+        return result
+    return _extract_json(str(result))
 
 # ── Orchestrator ────────────────────────────────────────────────
 
