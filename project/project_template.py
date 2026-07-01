@@ -633,7 +633,7 @@ smolagents_model = OpenAIServerModel(
     api_key=os.environ.get("UDACITY_OPENAI_API_KEY", ""),
 )
 
-# ── Inventory tools ────────────────────────────────────────────────
+# ── Tools ────────────────────────────────────────────────
 
 def normalize_date(date_str: str) -> str:
     """
@@ -648,7 +648,12 @@ def normalize_date(date_str: str) -> str:
 
 @tool
 def tool_check_all_inventory(as_of_date: str) -> dict:
-    """Return the full inventory snapshot as of a given date."""
+    """
+    Return the full inventory snapshot as of a given date.
+
+    Args:
+        as_of_date: ISO date string in YYYY-MM-DD format
+    """
     as_of_date = normalize_date(as_of_date)
     inventory = get_all_inventory(as_of_date)
     return {
@@ -657,9 +662,17 @@ def tool_check_all_inventory(as_of_date: str) -> dict:
         "as_of_date": as_of_date,
     }
 
+
 @tool
 def tool_check_item_stock(item_name: str, as_of_date: str, requested_qty: int) -> dict:
-    """Check whether sufficient stock exists for a specific item and quantity."""
+    """
+    Check whether sufficient stock exists for a specific item and quantity.
+
+    Args:
+        item_name: Exact name of the inventory item to check
+        as_of_date: ISO date string in YYYY-MM-DD format
+        requested_qty: Number of units the customer wants
+    """
     as_of_date = normalize_date(as_of_date)
     result_df = get_stock_level(item_name, as_of_date)
     stock = int(result_df["current_stock"].iloc[0]) if not result_df.empty else 0
@@ -672,16 +685,23 @@ def tool_check_item_stock(item_name: str, as_of_date: str, requested_qty: int) -
         "shortfall": max(0, requested_qty - stock),
     }
 
+
 @tool
 def tool_reorder_item(item_name: str, quantity: int, as_of_date: str) -> dict:
-    """Place a stock replenishment order for a low-stock item."""
+    """
+    Place a stock replenishment order for a low-stock item.
+
+    Args:
+        item_name: Name of the item to reorder
+        quantity: Number of units to reorder
+        as_of_date: ISO date string in YYYY-MM-DD format
+    """
     as_of_date = normalize_date(as_of_date)
     unit_price = next(
         (p["unit_price"] for p in paper_supplies if p["item_name"] == item_name), 0.10
     )
     total_cost = round(unit_price * quantity, 2)
     delivery_date = get_supplier_delivery_date(as_of_date, quantity)
-
     txn_id = create_transaction(
         item_name=item_name,
         transaction_type="stock_orders",
@@ -699,23 +719,31 @@ def tool_reorder_item(item_name: str, quantity: int, as_of_date: str) -> dict:
     }
 
 
-# ── Quoting tools ────────────────────────────────────────────────
 @tool
 def tool_search_quote_history(search_terms: list, limit: int = 5) -> dict:
-    """Retrieve historical quotes relevant to the current request for pricing context."""
+    """
+    Retrieve historical quotes relevant to the current request for pricing context.
+
+    Args:
+        search_terms: List of keywords to search in quote history
+        limit: Maximum number of past quotes to return
+    """
     quotes = search_quote_history(search_terms, limit=limit)
     return {"quotes": quotes, "count": len(quotes)}
+
 
 @tool
 def tool_calculate_quote(line_items: list, order_size: str) -> dict:
     """
-    Calculate a price quote with bulk discounts.
-    Discount tiers: large/>2000 units = 10%, medium/>500 units = 5%, else 0%.
+    Calculate a price quote with bulk discounts for a list of line items.
+
+    Args:
+        line_items: List of dicts each with item_name, quantity, and unit_price
+        order_size: Size of the order, one of small, medium, or large
     """
     subtotal = 0.0
     total_qty = 0
     breakdown = []
-
     for item in line_items:
         name = item["item_name"]
         qty = item["quantity"]
@@ -729,17 +757,14 @@ def tool_calculate_quote(line_items: list, order_size: str) -> dict:
             "unit_price": price,
             "line_total": line_cost,
         })
-
     if order_size == "large" or total_qty > 2000:
         discount_pct = 0.10
     elif order_size == "medium" or total_qty > 500:
         discount_pct = 0.05
     else:
         discount_pct = 0.0
-
     discount_amount = round(subtotal * discount_pct, 2)
     total = round(subtotal - discount_amount, 2)
-
     return {
         "line_items": breakdown,
         "subtotal": round(subtotal, 2),
@@ -749,11 +774,16 @@ def tool_calculate_quote(line_items: list, order_size: str) -> dict:
         "order_size_label": order_size,
     }
 
-    # ── Sales tools ────────────────────────────────────────────────
 
 @tool
 def tool_get_delivery_date(as_of_date: str, total_quantity: int) -> dict:
-    """Estimate supplier delivery date based on total order quantity."""
+    """
+    Estimate supplier delivery date based on order date and total quantity.
+
+    Args:
+        as_of_date: ISO date string in YYYY-MM-DD format
+        total_quantity: Total number of units across all items in the order
+    """
     as_of_date = normalize_date(as_of_date)
     delivery = get_supplier_delivery_date(as_of_date, total_quantity)
     order_dt = datetime.fromisoformat(as_of_date)
@@ -768,11 +798,17 @@ def tool_get_delivery_date(as_of_date: str, total_quantity: int) -> dict:
 
 @tool
 def tool_finalize_sale(line_items: list, total_price: float, as_of_date: str) -> dict:
-    """Record completed sale transactions for each line item."""
+    """
+    Record completed sale transactions for each line item in the database.
+
+    Args:
+        line_items: List of dicts each with item_name and quantity
+        total_price: Total amount to charge the customer after discounts
+        as_of_date: ISO date string in YYYY-MM-DD format
+    """
     as_of_date = normalize_date(as_of_date)
     txn_ids = []
     total_qty = sum(item["quantity"] for item in line_items)
-
     for item in line_items:
         share = item["quantity"] / total_qty if total_qty else 0
         item_price = round(total_price * share, 2)
@@ -784,7 +820,6 @@ def tool_finalize_sale(line_items: list, total_price: float, as_of_date: str) ->
             date=as_of_date,
         )
         txn_ids.append(txn_id)
-
     return {
         "transaction_ids": txn_ids,
         "total_charged": total_price,
@@ -796,11 +831,15 @@ def tool_finalize_sale(line_items: list, total_price: float, as_of_date: str) ->
 
 @tool
 def tool_get_cash_balance(as_of_date: str) -> dict:
-    """Return current cash balance as of a date."""
+    """
+    Return the current cash balance as of a given date.
+
+    Args:
+        as_of_date: ISO date string in YYYY-MM-DD format
+    """
     as_of_date = normalize_date(as_of_date)
     balance = get_cash_balance(as_of_date)
     return {"cash_balance": round(balance, 2), "as_of_date": as_of_date}
-
 
 # ── Tool schemas (OpenAI function-calling format) ────────────────────
 
