@@ -933,7 +933,7 @@ def run_agent(system_prompt: str, user_message: str, agent_tools: list, max_step
     )
     full_prompt = f"{system_prompt}\n\n{user_message}"
     result = agent.run(full_prompt)
-        # smolagents returns the final_answer value directly — could be dict, str, or other
+    # smolagents returns the final_answer value directly — could be dict, str, or other
     if isinstance(result, dict):
         return result
     return str(result)
@@ -1245,9 +1245,16 @@ def handle_customer_request(request: str, request_date: str, order_size: str = "
     """
     print(f"\n[Orchestrator] Processing request ({order_size}, {request_date})")
 
-    # Step 1: Inventory check
+    # Step 1: Inventory check — include exact catalog names so LLM can match precisely
     print("[InventoryAgent] Checking stock...")
-    inv_result = inventory_agent(request, request_date)
+    available_catalog = get_all_inventory(normalize_date(request_date))
+    catalog_names = list(available_catalog.keys())
+    task_with_catalog = (
+        f"{request}\n\n"
+        f"Available catalog item names (use EXACT spelling when calling tools):\n"
+        + "\n".join(f"- {name}" for name in catalog_names)
+    )
+    inv_result = inventory_agent(task_with_catalog, request_date)
     fulfilled_items = [
     item for item in inv_result.get("fulfilled_items", [])
     if str(item.get("fulfillable", "")).lower() == "yes"]
