@@ -952,6 +952,8 @@ Your responsibilities:
     fulfilled_items: list of {item_name, catalog_name, quantity, stock_available, fulfillable}
     unfulfillable_items: list of {item_name, reason}
     reorders_placed: list of reorder confirmations
+- When calling final_answer, pass ONLY the 'answer' argument. Do not pass any other arguments
+  such as 'date', 'item_count', or any other fields — these will cause errors.
 """
 
 def _extract_json(text: str) -> dict:
